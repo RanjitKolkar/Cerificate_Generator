@@ -4,3 +4,4 @@ fpdf
 pillow
 pdf2image
 openpyxl
+poppler-utils
