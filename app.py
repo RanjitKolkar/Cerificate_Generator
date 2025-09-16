@@ -8,8 +8,14 @@ import re
 import shutil
 from pdf2image import convert_from_path
 
+
+# Font controls
+font_family = st.sidebar.selectbox("Font Family", ["Times", "Arial", "Courier", "Helvetica", "Symbol", "ZapfDingbats"])
+font_style = st.sidebar.selectbox("Font Style", ["Normal", "Bold", "Italic", "Bold+Italic"])
+font_color = st.sidebar.color_picker("Font Color", "#000000")  # hex color
+
 # ------------------ APP CONFIG ------------------
-st.set_page_config(page_title="Certify Pro", layout="wide")
+st.set_page_config(page_title="Certi Gen", layout="wide")
 
 st.markdown("<h1 style='color:#2E86C1;'>🎓 Certify Pro</h1>", unsafe_allow_html=True)
 st.markdown("<h4 style='color:#117A65;'>Automate certificate creation with names & signatures</h4>", unsafe_allow_html=True)
@@ -21,7 +27,7 @@ sign_files = st.file_uploader("✍️ Upload Signature Images (PNG/JPG)", type=[
 
 # ------------------ SETTINGS ------------------
 st.sidebar.header("⚙️ Placement Settings (mm units)")
-name_y = st.sidebar.number_input("Name Y position", value=105)   # middle of A4 landscape
+name_y = st.sidebar.number_input("Name Y position, + is up", value=105)   # middle of A4 landscape
 font_size = st.sidebar.number_input("Font Size", value=32)
 
 sign_positions = []
