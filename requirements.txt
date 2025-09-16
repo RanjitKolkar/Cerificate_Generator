@@ -1,4 +1,6 @@
 streamlit
 pandas
-fpdf2
+fpdf
+pillow
+pdf2image
 openpyxl
