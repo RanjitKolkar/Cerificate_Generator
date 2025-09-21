@@ -90,7 +90,7 @@ if template_file and excel_file:
 
         # Add number
         if enable_number:
-            pdf.set_font("Arial", 'B', 14)
+            pdf.set_font("Arial", 'B', 10)
             cert_no = f"{number_prefix}TEST001"
             pdf.text(x=number_x, y=number_y, txt=cert_no)
 
