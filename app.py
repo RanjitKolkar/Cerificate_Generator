@@ -166,7 +166,7 @@ if template_file and excel_file:
                 )
                 progress_bar.progress(idx / total)
     
-                status.info(
+                current_status.info(
                     f"Generating certificate {idx}/{total}: {name}"
                 )
     
@@ -253,7 +253,7 @@ if template_file and excel_file:
                         f"Error generating {name}: {e}"
                     )
     
-            status.info(
+            current_status.info(
                 "Creating ZIP file..."
             )
     
@@ -288,7 +288,7 @@ if template_file and excel_file:
                 - start_time
             )
     
-            status.success(
+            current_status.success(
                 f"Completed in "
                 f"{elapsed:.2f} seconds"
             )
