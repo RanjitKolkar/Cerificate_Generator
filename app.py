@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import time
 from fpdf import FPDF
 from PIL import Image
 import os
