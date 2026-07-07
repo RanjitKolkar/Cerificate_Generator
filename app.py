@@ -115,51 +115,54 @@ if template_file and excel_file:
             st.download_button("⬇️ Download Preview", f, file_name="preview_test.pdf")
 
     # ------------------ GENERATE ALL ------------------
-    status_df = pd.DataFrame({
-            "Name": names,
-            "Status": ["⏳ Pending"] * len(names)
-        })
-        
-        status_placeholder = st.empty()
-        status_placeholder.dataframe(
-            status_df,
-            use_container_width=True,
-            height=400
-        )
-    
-    if st.button("🚀 Generate All Certificates"):
-        status_df = pd.DataFrame({
-            "Name": names,
-            "Status": ["⏳ Pending"] * len(names)
-        })
-        
-        status_placeholder = st.empty()
-        status_placeholder.dataframe(
-            status_df,
-            use_container_width=True,
-            height=400
-        )
-        start_time = time.time()
-    
-        progress_bar = st.progress(0)
-        status = st.empty()
-    
-        with tempfile.TemporaryDirectory() as tmpdir:
-    
-            page_width = 297
-            total = len(names)
-    
-            for idx, name in enumerate(names, start=1):
-                # Generate PDF here
+        if st.button("🚀 Generate All Certificates"):
 
-                status_df.loc[idx-1, "Status"] = "✅ Completed"
-            
-                progress_bar.progress(idx / len(names))
-            
-                status_placeholder.dataframe(
-                    status_df,
-                    use_container_width=True,
-                    height=400
+            status_df = pd.DataFrame({
+                "Name": names,
+                "Status": ["⏳ Pending"] * len(names)
+            })
+        
+            status_placeholder = st.empty()
+            progress_bar = st.progress(0)
+            current_status = st.empty()
+        
+            status_placeholder.dataframe(
+                status_df,
+                use_container_width=True,
+                height=400
+            )
+        
+            start_time = time.time()
+        
+            with tempfile.TemporaryDirectory() as tmpdir:
+        
+                page_width = 297
+                total = len(names)
+        
+                for idx, name in enumerate(names, start=1):
+        
+                    current_status.info(
+                        f"Generating {idx}/{total}: {name}"
+                    )
+        
+                    # ------------------
+                    # Generate PDF here
+                    # ------------------
+        
+                    status_df.loc[idx-1, "Status"] = "✅ Completed"
+        
+                    progress_bar.progress(idx / total)
+        
+                    # Update table every 5 certificates
+                    if idx % 5 == 0 or idx == total:
+                        status_placeholder.dataframe(
+                            status_df,
+                            use_container_width=True,
+                            height=400
+                        )
+        
+                current_status.success(
+                    f"🎉 Completed {total} certificates"
                 )
                 progress_bar.progress(idx / total)
     
