@@ -103,7 +103,8 @@ if template_file and excel_file:
 
         # Show inline preview
         try:
-            pages = convert_from_path(preview_pdf.name, dpi=150)
+            with st.spinner("Generating preview..."):
+                pages = convert_from_path(preview_pdf.name, dpi=60)
             st.image(pages[0], caption=f"📄 Preview: {test_name}", use_column_width=True)
         except Exception:
             st.warning("⚠️ Preview unavailable (Poppler missing).")
@@ -113,39 +114,161 @@ if template_file and excel_file:
             st.download_button("⬇️ Download Preview", f, file_name="preview_test.pdf")
 
     # ------------------ GENERATE ALL ------------------
-    if st.button("🚀 Generate All Certificates"):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            page_width = 297
-            for idx, name in enumerate(names, start=1):
-                pdf = FPDF('L', 'mm', 'A4')
-                pdf.add_page()
-                pdf.image(template_path, x=0, y=0, w=297, h=210)
+   if st.button("🚀 Generate All Certificates"):
 
-                # Name
-                pdf.set_font(font_family, '', int(font_size))
-                pdf.set_xy(0, float(name_y))
-                pdf.cell(page_width, 10, txt=str(name), align='C')
+    start_time = time.time()
 
-                # Number
-                if enable_number:
-                    cert_no = f"{number_prefix}{idx:03d}"
-                    pdf.set_font("Arial", 'B', 14)
-                    pdf.text(x=number_x, y=number_y, txt=cert_no)
+    progress_bar = st.progress(0)
+    status = st.empty()
 
-                # Signatures
-                for sign_path, pos in zip(sign_paths, sign_positions):
-                    sx, sy, sw = pos
-                    pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
+    with tempfile.TemporaryDirectory() as tmpdir:
 
-                safe_name = re.sub(r'[^A-Za-z0-9]+', '_', str(name)).strip('_')
-                out_path = os.path.join(tmpdir, f"{safe_name}.pdf")
+        page_width = 297
+        total = len(names)
+
+        for idx, name in enumerate(names, start=1):
+
+            progress_bar.progress(idx / total)
+
+            status.info(
+                f"Generating certificate {idx}/{total}: {name}"
+            )
+
+            pdf = FPDF('L', 'mm', 'A4')
+            pdf.add_page()
+
+            pdf.image(
+                template_path,
+                x=0,
+                y=0,
+                w=297,
+                h=210
+            )
+
+            # Name
+            pdf.set_font(
+                font_family,
+                '',
+                int(font_size)
+            )
+
+            pdf.set_xy(
+                0,
+                float(name_y)
+            )
+
+            pdf.cell(
+                page_width,
+                10,
+                txt=str(name),
+                align='C'
+            )
+
+            # Certificate Number
+            if enable_number:
+
+                cert_no = (
+                    f"{number_prefix}{idx:03d}"
+                )
+
+                pdf.set_font(
+                    "Arial",
+                    'B',
+                    14
+                )
+
+                pdf.text(
+                    x=float(number_x),
+                    y=float(number_y),
+                    txt=cert_no
+                )
+
+            # Signatures
+            for sign_path, pos in zip(
+                sign_paths,
+                sign_positions
+            ):
+
+                sx, sy, sw = pos
+
+                pdf.image(
+                    sign_path,
+                    x=float(sx),
+                    y=float(sy),
+                    w=float(sw)
+                )
+
+            safe_name = re.sub(
+                r'[^A-Za-z0-9]+',
+                '_',
+                str(name)
+            ).strip('_')
+
+            out_path = os.path.join(
+                tmpdir,
+                f"{safe_name}.pdf"
+            )
+
+            try:
                 pdf.output(out_path)
 
-            # Zip them
-            zip_path = os.path.join(tmpdir, "certificates.zip")
-            shutil.make_archive(zip_path.replace(".zip", ""), 'zip', tmpdir)
+            except Exception as e:
+                st.error(
+                    f"Error generating {name}: {e}"
+                )
 
-            with open(zip_path, "rb") as f:
-                st.download_button("⬇️ Download All Certificates (ZIP)", f, file_name="certificates.zip")
+        status.info(
+            "Creating ZIP file..."
+        )
 
-        st.success("🎉 All certificates generated successfully!")
+        zip_path = os.path.join(
+            tmpdir,
+            "certificates.zip"
+        )
+
+        try:
+
+            shutil.make_archive(
+                zip_path.replace(
+                    ".zip",
+                    ""
+                ),
+                'zip',
+                tmpdir
+            )
+
+        except Exception as e:
+
+            st.error(
+                f"ZIP creation failed: {e}"
+            )
+
+            st.stop()
+
+        progress_bar.progress(1.0)
+
+        elapsed = (
+            time.time()
+            - start_time
+        )
+
+        status.success(
+            f"Completed in "
+            f"{elapsed:.2f} seconds"
+        )
+
+        with open(
+            zip_path,
+            "rb"
+        ) as f:
+
+            st.download_button(
+                "⬇️ Download All Certificates (ZIP)",
+                f,
+                file_name="certificates.zip"
+            )
+
+        st.success(
+            f"🎉 Successfully generated "
+            f"{total} certificates"
+        )
