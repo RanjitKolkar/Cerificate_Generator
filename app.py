@@ -114,7 +114,7 @@ if template_file and excel_file:
             st.download_button("⬇️ Download Preview", f, file_name="preview_test.pdf")
 
     # ------------------ GENERATE ALL ------------------
-       if st.button("🚀 Generate All Certificates"):
+    if st.button("🚀 Generate All Certificates"):
     
         start_time = time.time()
     
