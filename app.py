@@ -128,7 +128,17 @@ if template_file and excel_file:
         )
     
     if st.button("🚀 Generate All Certificates"):
-    
+        status_df = pd.DataFrame({
+            "Name": names,
+            "Status": ["⏳ Pending"] * len(names)
+        })
+        
+        status_placeholder = st.empty()
+        status_placeholder.dataframe(
+            status_df,
+            use_container_width=True,
+            height=400
+        )
         start_time = time.time()
     
         progress_bar = st.progress(0)
