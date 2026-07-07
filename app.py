@@ -134,45 +134,20 @@ if template_file and excel_file:
         
             start_time = time.time()
         
-            with tempfile.TemporaryDirectory() as tmpdir:
+            total = len(names)
+            page_width = 297
         
-                page_width = 297
-                total = len(names)
+            # ONE PDF FOR ALL CERTIFICATES
+            pdf = FPDF('L', 'mm', 'A4')
         
-                for idx, name in enumerate(names, start=1):
+            for idx, name in enumerate(names, start=1):
         
-                    current_status.info(
-                        f"Generating {idx}/{total}: {name}"
-                    )
-        
-                    # ------------------
-                    # Generate PDF here
-                    # ------------------
-        
-                    status_df.loc[idx-1, "Status"] = "✅ Completed"
-        
-                    progress_bar.progress(idx / total)
-        
-                    # Update table every 5 certificates
-                    if idx % 5 == 0 or idx == total:
-                        status_placeholder.dataframe(
-                            status_df,
-                            use_container_width=True,
-                            height=400
-                        )
-        
-                current_status.success(
-                    f"🎉 Completed {total} certificates"
-                )
-                progress_bar.progress(idx / total)
-    
                 current_status.info(
-                    f"Generating certificate {idx}/{total}: {name}"
+                    f"Generating {idx}/{total}: {name}"
                 )
-    
-                pdf = FPDF('L', 'mm', 'A4')
+        
                 pdf.add_page()
-    
+        
                 pdf.image(
                     template_path,
                     x=0,
@@ -180,131 +155,92 @@ if template_file and excel_file:
                     w=297,
                     h=210
                 )
-    
+        
                 # Name
                 pdf.set_font(
                     font_family,
                     '',
                     int(font_size)
                 )
-    
+        
                 pdf.set_xy(
                     0,
                     float(name_y)
                 )
-    
+        
                 pdf.cell(
                     page_width,
                     10,
                     txt=str(name),
                     align='C'
                 )
-    
+        
                 # Certificate Number
                 if enable_number:
-    
-                    cert_no = (
-                        f"{number_prefix}{idx:03d}"
-                    )
-    
+        
+                    cert_no = f"{number_prefix}{idx:03d}"
+        
                     pdf.set_font(
                         "Arial",
                         'B',
                         14
                     )
-    
+        
                     pdf.text(
                         x=float(number_x),
                         y=float(number_y),
                         txt=cert_no
                     )
-    
+        
                 # Signatures
                 for sign_path, pos in zip(
                     sign_paths,
                     sign_positions
                 ):
-    
+        
                     sx, sy, sw = pos
-    
+        
                     pdf.image(
                         sign_path,
                         x=float(sx),
                         y=float(sy),
                         w=float(sw)
                     )
-    
-                safe_name = re.sub(
-                    r'[^A-Za-z0-9]+',
-                    '_',
-                    str(name)
-                ).strip('_')
-    
-                out_path = os.path.join(
-                    tmpdir,
-                    f"{safe_name}.pdf"
-                )
-    
-                try:
-                    pdf.output(out_path)
-    
-                except Exception as e:
-                    st.error(
-                        f"Error generating {name}: {e}"
+        
+                status_df.loc[idx-1, "Status"] = "✅ Completed"
+        
+                progress_bar.progress(idx / total)
+        
+                if idx % 5 == 0 or idx == total:
+                    status_placeholder.dataframe(
+                        status_df,
+                        use_container_width=True,
+                        height=400
                     )
-    
-            current_status.info(
-                "Creating ZIP file..."
+        
+            # SAVE SINGLE PDF
+            output_pdf = tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=".pdf"
             )
-    
-            zip_path = os.path.join(
-                tmpdir,
-                "certificates.zip"
-            )
-    
-            try:
-    
-                shutil.make_archive(
-                    zip_path.replace(
-                        ".zip",
-                        ""
-                    ),
-                    'zip',
-                    tmpdir
-                )
-    
-            except Exception as e:
-    
-                st.error(
-                    f"ZIP creation failed: {e}"
-                )
-    
-                st.stop()
-    
-            progress_bar.progress(1.0)
-    
-            elapsed = (
-                time.time()
-                - start_time
-            )
-    
+        
+            pdf.output(output_pdf.name)
+        
+            elapsed = time.time() - start_time
+        
             current_status.success(
-                f"Completed in "
-                f"{elapsed:.2f} seconds"
+                f"🎉 Generated {total} certificates in {elapsed:.2f} seconds"
             )
-    
-            with open(
-                zip_path,
-                "rb"
-            ) as f:
-    
+        
+            with open(output_pdf.name, "rb") as f:
+        
                 st.download_button(
-                    "⬇️ Download All Certificates (ZIP)",
-                    f,
-                    file_name="certificates.zip"
+                    "⬇️ Download All Certificates (Single PDF)",
+                    data=f,
+                    file_name="all_certificates.pdf",
+                    mime="application/pdf"
                 )
-    
+        
             st.success(
-                f"🎉 Successfully generated "
-                f"{total} certificates"
+                f"Successfully generated {total} certificates"
             )
