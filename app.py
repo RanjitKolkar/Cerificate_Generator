@@ -67,6 +67,20 @@ st.markdown(
             color: var(--cg-text-dark);
         }
     }
+        .app-footer {
+            margin-top: 24px;
+            padding-top: 12px;
+            border-top: 1px solid var(--cg-border-light);
+            text-align: center;
+            color: #475569;
+            font-size: 14px;
+        }
+        @media (prefers-color-scheme: dark) {
+            .app-footer {
+                border-top-color: var(--cg-border-dark);
+                color: #cbd5e1;
+            }
+        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -174,11 +188,16 @@ font_size = st.sidebar.number_input("Font Size", value=34)
 
 # Certificate numbering
 enable_number = st.sidebar.checkbox("Enable Certificate Numbering")
-number_prefix = st.sidebar.text_input("Number Prefix (optional)", "")
+if "number_prefix" not in st.session_state:
+    st.session_state["number_prefix"] = ""
+if enable_number:
+    st.sidebar.markdown(
+        f"<div style='font-family:{font_family}; font-size:16px; margin-bottom:6px;'><b>Numbering preview:</b> {st.session_state['number_prefix']}001</div>",
+        unsafe_allow_html=True,
+    )
+number_prefix = st.sidebar.text_input("Number Prefix (optional)", key="number_prefix")
 number_y = st.sidebar.number_input("Number Y Position", value=20, key="number_y")
 number_x = st.sidebar.number_input("Number X Position", value=250, key="number_x")
-if enable_number:
-    st.sidebar.caption(f"Numbering preview: {number_prefix}001")
 
 # Signatures
 use_signatures = st.sidebar.checkbox("Use Signatures", value=True)
@@ -281,14 +300,6 @@ def render_preview_with_pymupdf(pdf_path, dpi=150):
     except Exception:
         return None
 
-def add_certificate_footer(pdf, page_width):
-    """Add a centered footer label to the current certificate page."""
-    pdf.set_font("Arial", 'I', 9)
-    pdf.set_text_color(80, 80, 80)
-    pdf.set_xy(0, 202)
-    pdf.cell(page_width, 6, txt="Coding Club NFSU Goa", align='C')
-    pdf.set_text_color(0, 0, 0)
-
 # ------------------ MAIN ------------------
 if active_template_input and active_excel_input:
     try:
@@ -344,7 +355,7 @@ if active_template_input and active_excel_input:
 
         # Add number
         if enable_number:
-            pdf.set_font("Arial", 'B', 10)
+            pdf.set_font(font_family, 'B', 10)
             cert_no = f"{number_prefix}001"
             pdf.text(x=number_x, y=number_y, txt=cert_no)
 
@@ -352,8 +363,6 @@ if active_template_input and active_excel_input:
         for sign_path, pos in zip(sign_paths, sign_positions):
             sx, sy, sw = pos
             pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
-
-        add_certificate_footer(pdf, page_width)
 
         pdf.output(preview_pdf.name)
 
@@ -450,7 +459,7 @@ if active_template_input and active_excel_input:
         
                 # Certificate Number
                 if enable_number:
-                    pdf.set_font("Arial", 'B', 14)
+                    pdf.set_font(font_family, 'B', 14)
                     pdf.text(x=number_x, y=number_y, txt=cert_no)
 
                 # Signatures
@@ -461,8 +470,6 @@ if active_template_input and active_excel_input:
         
                     sx, sy, sw = pos
                     pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
-
-                add_certificate_footer(pdf, page_width)
 
                 safe_name = re.sub(r'[^A-Za-z0-9]+', '_', str(name)).strip('_')
                 out_path = os.path.join(individual_dir, f"{safe_name}.pdf")
@@ -478,15 +485,13 @@ if active_template_input and active_excel_input:
 
                 # Number
                 if enable_number:
-                    merged_pdf.set_font("Arial", 'B', 14)
+                    merged_pdf.set_font(font_family, 'B', 14)
                     merged_pdf.text(x=number_x, y=number_y, txt=cert_no)
 
                 # Signatures
                 for sign_path, pos in zip(sign_paths, sign_positions):
                     sx, sy, sw = pos
                     merged_pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
-
-                add_certificate_footer(merged_pdf, page_width)
 
                 status_df.loc[idx-1, "Status"] = "✅ Completed"
                 progress_bar.progress(idx / total)
@@ -526,3 +531,5 @@ if active_template_input and active_excel_input:
                 )
 
         st.success("🎉 Certificates generated! Download merged PDF or separate ZIP.")
+
+st.markdown("<div class='app-footer'>Coding Club NFSU Goa</div>", unsafe_allow_html=True)
