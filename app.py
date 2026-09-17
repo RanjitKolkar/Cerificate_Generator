@@ -6,12 +6,24 @@ import os
 import tempfile
 import re
 import shutil
+import base64
 from pdf2image import convert_from_path
 
 # ------------------ APP CONFIG ------------------
 st.set_page_config(page_title="Certi Gen", layout="wide")
 st.markdown("<h1 style='color:#2E86C1;'>🎓 Certify Pro+</h1>", unsafe_allow_html=True)
-st.markdown("<h4 style='color:#117A65;'>Smart certificate generator with numbering & custom fields</h4>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <h4 style='color:#117A65;'>
+    Generate polished certificates in bulk with dynamic names, optional numbering, and custom signatures.
+    </h4>
+    <p style='font-size:16px;'>
+    Numbering format is <b>Prefix + 3-digit sequence</b> (example: CERT001, TRAINING001).<br>
+    Leave prefix blank to use plain numbering only (001, 002, 003...).
+    </p>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ------------------ FILE UPLOADS ------------------
 template_file = st.file_uploader("📄 Upload Certificate Template (JPG/PNG)", type=["jpg", "jpeg", "png"])
@@ -28,9 +40,11 @@ font_size = st.sidebar.number_input("Font Size", value=32)
 
 # Certificate numbering
 enable_number = st.sidebar.checkbox("Enable Certificate Numbering")
-number_prefix = st.sidebar.text_input("Number Prefix", "CERT-")
+number_prefix = st.sidebar.text_input("Number Prefix (optional)", "")
 number_y = st.sidebar.number_input("Number Y Position", value=20)
 number_x = st.sidebar.number_input("Number X Position", value=250)
+if enable_number:
+    st.sidebar.caption(f"Numbering preview: {number_prefix}001")
 
 # Signatures
 sign_positions = []
@@ -52,6 +66,54 @@ def save_uploaded_file_to_tmp(uploaded_file):
     tmp.write(uploaded_file.read())
     tmp.close()
     return tmp.name
+
+def get_poppler_path():
+    """Return a valid Poppler bin path if available on this machine."""
+    env_path = os.getenv("POPPLER_PATH")
+    if env_path and os.path.isdir(env_path):
+        return env_path
+
+    common_paths = [
+        r"C:\\Program Files\\poppler\\Library\\bin",
+        r"C:\\Program Files (x86)\\poppler\\Library\\bin",
+        r"C:\\poppler\\Library\\bin",
+        r"C:\\tools\\poppler\\Library\\bin",
+    ]
+    for path in common_paths:
+        if os.path.isdir(path):
+            return path
+    return None
+
+def show_pdf_fallback_preview(pdf_path):
+    """Fallback preview: display PDF directly in the browser using base64."""
+    with open(pdf_path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("utf-8")
+    st.markdown(
+        f"""
+        <iframe
+            src="data:application/pdf;base64,{encoded}"
+            width="100%"
+            height="650"
+            type="application/pdf"
+            style="border: 1px solid #ccc; border-radius: 8px;"
+        ></iframe>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def render_preview_with_pymupdf(pdf_path, dpi=150):
+    """Render first page using PyMuPDF (no Poppler required)."""
+    try:
+        import fitz  # PyMuPDF
+        zoom = dpi / 72
+        with fitz.open(pdf_path) as doc:
+            if len(doc) == 0:
+                return None
+            page = doc[0]
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+        return Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    except Exception:
+        return None
 
 # ------------------ MAIN ------------------
 if template_file and excel_file:
@@ -91,7 +153,7 @@ if template_file and excel_file:
         # Add number
         if enable_number:
             pdf.set_font("Arial", 'B', 10)
-            cert_no = f"{number_prefix}TEST001"
+            cert_no = f"{number_prefix}001"
             pdf.text(x=number_x, y=number_y, txt=cert_no)
 
         # Add signatures
@@ -103,20 +165,42 @@ if template_file and excel_file:
 
         # Show inline preview
         try:
-            pages = convert_from_path(preview_pdf.name, dpi=150)
-            st.image(pages[0], caption=f"📄 Preview: {test_name}", use_column_width=True)
-        except Exception:
-            st.warning("⚠️ Preview unavailable (Poppler missing).")
+            poppler_path = get_poppler_path()
+            convert_kwargs = {"dpi": 150, "first_page": 1, "last_page": 1}
+            if poppler_path:
+                convert_kwargs["poppler_path"] = poppler_path
+
+            pages = convert_from_path(preview_pdf.name, **convert_kwargs)
+            st.image(pages[0], caption=f"📄 Preview: {test_name}", use_container_width=True)
+        except Exception as e:
+            pymupdf_image = render_preview_with_pymupdf(preview_pdf.name)
+            if pymupdf_image is not None:
+                st.image(pymupdf_image, caption=f"📄 Preview: {test_name}", use_container_width=True)
+                st.caption("Preview rendered using PyMuPDF fallback (Poppler not required).")
+            else:
+                st.warning("⚠️ Image preview unavailable. Showing embedded PDF preview instead.")
+                show_pdf_fallback_preview(preview_pdf.name)
+                st.caption(
+                    "Tip (Windows): install Poppler and set POPPLER_PATH to its 'Library\\bin' folder "
+                    "for faster image-based preview."
+                )
 
         # Download preview
         with open(preview_pdf.name, "rb") as f:
             st.download_button("⬇️ Download Preview", f, file_name="preview_test.pdf")
 
     # ------------------ GENERATE ALL ------------------
-    if st.button("🚀 Generate All Certificates"):
+    if st.button("🚀 Generate Certificates"):
         with tempfile.TemporaryDirectory() as tmpdir:
             page_width = 297
+            individual_dir = os.path.join(tmpdir, "individual_certificates")
+            os.makedirs(individual_dir, exist_ok=True)
+            merged_pdf = FPDF('L', 'mm', 'A4')
+
             for idx, name in enumerate(names, start=1):
+                cert_no = f"{number_prefix}{idx:03d}"
+
+                # Individual PDF
                 pdf = FPDF('L', 'mm', 'A4')
                 pdf.add_page()
                 pdf.image(template_path, x=0, y=0, w=297, h=210)
@@ -128,7 +212,6 @@ if template_file and excel_file:
 
                 # Number
                 if enable_number:
-                    cert_no = f"{number_prefix}{idx:03d}"
                     pdf.set_font("Arial", 'B', 14)
                     pdf.text(x=number_x, y=number_y, txt=cert_no)
 
@@ -138,14 +221,47 @@ if template_file and excel_file:
                     pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
 
                 safe_name = re.sub(r'[^A-Za-z0-9]+', '_', str(name)).strip('_')
-                out_path = os.path.join(tmpdir, f"{safe_name}.pdf")
+                out_path = os.path.join(individual_dir, f"{safe_name}.pdf")
                 pdf.output(out_path)
 
-            # Zip them
-            zip_path = os.path.join(tmpdir, "certificates.zip")
-            shutil.make_archive(zip_path.replace(".zip", ""), 'zip', tmpdir)
+                # Merged single PDF (one page per certificate)
+                merged_pdf.add_page()
+                merged_pdf.image(template_path, x=0, y=0, w=297, h=210)
+
+                # Name
+                merged_pdf.set_font(font_family, '', int(font_size))
+                merged_pdf.set_xy(0, float(name_y))
+                merged_pdf.cell(page_width, 10, txt=str(name), align='C')
+
+                # Number
+                if enable_number:
+                    merged_pdf.set_font("Arial", 'B', 14)
+                    merged_pdf.text(x=number_x, y=number_y, txt=cert_no)
+
+                # Signatures
+                for sign_path, pos in zip(sign_paths, sign_positions):
+                    sx, sy, sw = pos
+                    merged_pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
+
+            merged_pdf_path = os.path.join(tmpdir, "all_certificates_merged.pdf")
+            merged_pdf.output(merged_pdf_path)
+
+            # Zip only individual PDFs
+            zip_path = os.path.join(tmpdir, "certificates_separate.zip")
+            shutil.make_archive(zip_path.replace(".zip", ""), 'zip', individual_dir)
+
+            with open(merged_pdf_path, "rb") as f:
+                st.download_button(
+                    "⬇️ Download All Certificates (Single Merged PDF)",
+                    f,
+                    file_name="all_certificates_merged.pdf",
+                )
 
             with open(zip_path, "rb") as f:
-                st.download_button("⬇️ Download All Certificates (ZIP)", f, file_name="certificates.zip")
+                st.download_button(
+                    "⬇️ Download Separate Certificates (ZIP Folder)",
+                    f,
+                    file_name="certificates_separate.zip",
+                )
 
-        st.success("🎉 All certificates generated successfully!")
+        st.success("🎉 Certificates generated! Download merged PDF or separate ZIP.")
