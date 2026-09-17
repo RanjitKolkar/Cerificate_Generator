@@ -653,3 +653,11 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+st.markdown(
+    """
+    <div class='app-footer' style='margin-top:2px; padding-top:0; border-top:none; font-size:13px;'>
+    None of your data is stored at the developer side.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
