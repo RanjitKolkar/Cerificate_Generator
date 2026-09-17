@@ -645,3 +645,11 @@ st.markdown(
     f"<div class='app-footer'>Built by NFSU Goa Coding Club | Last updated: {last_updated} | Visitors: {visitor_count}</div>",
     unsafe_allow_html=True,
 )
+st.markdown(
+    """
+    <div class='app-footer' style='margin-top:6px; padding-top:0; border-top:none; font-size:13px;'>
+    To report any error, feedback, or thank you message: codingclub.nfsugoa@gmail.com
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
