@@ -121,6 +121,14 @@ def render_preview_with_pymupdf(pdf_path, dpi=150):
     except Exception:
         return None
 
+def add_certificate_footer(pdf, page_width):
+    """Add a centered footer label to the current certificate page."""
+    pdf.set_font("Arial", 'I', 9)
+    pdf.set_text_color(80, 80, 80)
+    pdf.set_xy(0, 202)
+    pdf.cell(page_width, 6, txt="Coding Club NFSU Goa", align='C')
+    pdf.set_text_color(0, 0, 0)
+
 # ------------------ MAIN ------------------
 if template_file and excel_file:
     try:
@@ -166,6 +174,8 @@ if template_file and excel_file:
         for sign_path, pos in zip(sign_paths, sign_positions):
             sx, sy, sw = pos
             pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
+
+        add_certificate_footer(pdf, page_width)
 
         pdf.output(preview_pdf.name)
 
@@ -274,6 +284,8 @@ if template_file and excel_file:
                     sx, sy, sw = pos
                     pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
 
+                add_certificate_footer(pdf, page_width)
+
                 safe_name = re.sub(r'[^A-Za-z0-9]+', '_', str(name)).strip('_')
                 out_path = os.path.join(individual_dir, f"{safe_name}.pdf")
                 pdf.output(out_path)
@@ -296,6 +308,8 @@ if template_file and excel_file:
                 for sign_path, pos in zip(sign_paths, sign_positions):
                     sx, sy, sw = pos
                     merged_pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
+
+                add_certificate_footer(merged_pdf, page_width)
 
                 status_df.loc[idx-1, "Status"] = "✅ Completed"
                 progress_bar.progress(idx / total)
