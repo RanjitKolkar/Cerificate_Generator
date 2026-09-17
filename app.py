@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import time
 from fpdf import FPDF
 from PIL import Image
 import os
@@ -165,14 +166,15 @@ if template_file and excel_file:
 
         # Show inline preview
         try:
-            poppler_path = get_poppler_path()
-            convert_kwargs = {"dpi": 150, "first_page": 1, "last_page": 1}
-            if poppler_path:
-                convert_kwargs["poppler_path"] = poppler_path
+            with st.spinner("Generating preview..."):
+                poppler_path = get_poppler_path()
+                convert_kwargs = {"dpi": 150, "first_page": 1, "last_page": 1}
+                if poppler_path:
+                    convert_kwargs["poppler_path"] = poppler_path
 
-            pages = convert_from_path(preview_pdf.name, **convert_kwargs)
+                pages = convert_from_path(preview_pdf.name, **convert_kwargs)
             st.image(pages[0], caption=f"📄 Preview: {test_name}", use_container_width=True)
-        except Exception as e:
+        except Exception:
             pymupdf_image = render_preview_with_pymupdf(preview_pdf.name)
             if pymupdf_image is not None:
                 st.image(pymupdf_image, caption=f"📄 Preview: {test_name}", use_container_width=True)
@@ -191,7 +193,25 @@ if template_file and excel_file:
 
     # ------------------ GENERATE ALL ------------------
     if st.button("🚀 Generate Certificates"):
+        status_df = pd.DataFrame({
+            "Name": names,
+            "Status": ["⏳ Pending"] * len(names)
+        })
+
+        status_placeholder = st.empty()
+        progress_bar = st.progress(0)
+        current_status = st.empty()
+
+        status_placeholder.dataframe(
+            status_df,
+            use_container_width=True,
+            height=400
+        )
+
+        start_time = time.time()
+
         with tempfile.TemporaryDirectory() as tmpdir:
+            total = len(names)
             page_width = 297
             individual_dir = os.path.join(tmpdir, "individual_certificates")
             os.makedirs(individual_dir, exist_ok=True)
@@ -200,23 +220,52 @@ if template_file and excel_file:
             for idx, name in enumerate(names, start=1):
                 cert_no = f"{number_prefix}{idx:03d}"
 
+                current_status.info(
+                    f"Generating {idx}/{total}: {name}"
+                )
+
                 # Individual PDF
                 pdf = FPDF('L', 'mm', 'A4')
                 pdf.add_page()
-                pdf.image(template_path, x=0, y=0, w=297, h=210)
-
+        
+                pdf.image(
+                    template_path,
+                    x=0,
+                    y=0,
+                    w=297,
+                    h=210
+                )
+        
                 # Name
-                pdf.set_font(font_family, '', int(font_size))
-                pdf.set_xy(0, float(name_y))
-                pdf.cell(page_width, 10, txt=str(name), align='C')
-
-                # Number
+                pdf.set_font(
+                    font_family,
+                    '',
+                    int(font_size)
+                )
+        
+                pdf.set_xy(
+                    0,
+                    float(name_y)
+                )
+        
+                pdf.cell(
+                    page_width,
+                    10,
+                    txt=str(name),
+                    align='C'
+                )
+        
+                # Certificate Number
                 if enable_number:
                     pdf.set_font("Arial", 'B', 14)
                     pdf.text(x=number_x, y=number_y, txt=cert_no)
 
                 # Signatures
-                for sign_path, pos in zip(sign_paths, sign_positions):
+                for sign_path, pos in zip(
+                    sign_paths,
+                    sign_positions
+                ):
+        
                     sx, sy, sw = pos
                     pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
 
@@ -243,8 +292,24 @@ if template_file and excel_file:
                     sx, sy, sw = pos
                     merged_pdf.image(sign_path, x=float(sx), y=float(sy), w=float(sw))
 
+                status_df.loc[idx-1, "Status"] = "✅ Completed"
+                progress_bar.progress(idx / total)
+
+                if idx % 5 == 0 or idx == total:
+                    status_placeholder.dataframe(
+                        status_df,
+                        use_container_width=True,
+                        height=400
+                    )
+
             merged_pdf_path = os.path.join(tmpdir, "all_certificates_merged.pdf")
             merged_pdf.output(merged_pdf_path)
+
+            elapsed = time.time() - start_time
+
+            current_status.success(
+                f"🎉 Generated {total} certificates in {elapsed:.2f} seconds"
+            )
 
             # Zip only individual PDFs
             zip_path = os.path.join(tmpdir, "certificates_separate.zip")
