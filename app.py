@@ -8,15 +8,74 @@ import tempfile
 import re
 import shutil
 import base64
+from io import BytesIO
 from pdf2image import convert_from_path
 
 # ------------------ APP CONFIG ------------------
 st.set_page_config(page_title="Certi Gen", layout="wide")
-st.markdown("<h1 style='color:#2E86C1;'>🎓 Certify Pro+</h1>", unsafe_allow_html=True)
 st.markdown(
     """
-    <div style='background:#F4F9FF; border:1px solid #D6EAF8; border-radius:10px; padding:14px 18px; margin-bottom:10px;'>
-    <h4 style='color:#117A65; margin:0 0 8px 0;'>How to Use</h4>
+    <style>
+    :root {
+        --cg-text-light: #1f2937;
+        --cg-text-dark: #e5e7eb;
+        --cg-card-light: #f3f7fb;
+        --cg-card-light-2: #eef4fa;
+        --cg-border-light: #cfd9e6;
+        --cg-card-dark: #1e293b;
+        --cg-card-dark-2: #243447;
+        --cg-border-dark: #3b4f66;
+    }
+    .app-title {
+        color: var(--cg-text-light);
+        margin-bottom: 0.25rem;
+    }
+    .top-info-card {
+        background: var(--cg-card-light);
+        border: 1px solid var(--cg-border-light);
+        border-left: 5px solid #6b8fb1;
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 10px;
+        color: var(--cg-text-light);
+    }
+    .top-info-card h4,
+    .top-info-card p {
+        color: inherit;
+    }
+    .upload-guide-card {
+        background: var(--cg-card-light-2);
+        border: 1px solid var(--cg-border-light);
+        border-left: 5px solid #6b8fb1;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        color: var(--cg-text-light);
+    }
+    @media (prefers-color-scheme: dark) {
+        .app-title {
+            color: var(--cg-text-dark);
+        }
+        .top-info-card {
+            background: var(--cg-card-dark);
+            border-color: var(--cg-border-dark);
+            color: var(--cg-text-dark);
+        }
+        .upload-guide-card {
+            background: var(--cg-card-dark-2);
+            border-color: var(--cg-border-dark);
+            color: var(--cg-text-dark);
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+st.markdown("<h1 class='app-title'>🎓 Certify Pro+</h1>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div class='top-info-card'>
+    <h4 style='margin:0 0 8px 0;'>How to Use</h4>
     <p style='font-size:18px; margin:4px 0;'>
     1) Upload a certificate template (JPG/PNG), 2) upload Excel with a <b>Name</b> column, 3) optionally add signatures,
     4) preview one certificate, then generate all.
@@ -31,32 +90,102 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Sample assets are used by default and can be replaced by uploads.
+SAMPLE_TEMPLATE_PATH = "SAMPLE CERTIFICATE.png"
+SAMPLE_EXCEL_PATH = "Name_list.xlsx"
+SAMPLE_SIGN_PATH = "SAMPLE SIGN.png"
+
 # ------------------ FILE UPLOADS ------------------
-template_file = st.file_uploader("📄 Upload Certificate Template (JPG/PNG)", type=["jpg", "jpeg", "png"])
-excel_file = st.file_uploader("📊 Upload Excel File (must have 'Name' column)", type=["xlsx"])
-sign_files = st.file_uploader("✍️ Upload Signature Images (PNG/JPG)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+st.markdown(
+    """
+    <div class='upload-guide-card'>
+    <p style='font-size:17px; margin:0;'>Default files are loaded. You can replace the certificate, replace the list, and replace the sign below.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+col_cert, col_list, col_sign = st.columns(3)
+with col_cert:
+    st.markdown("#### Replace Certificate")
+    template_file = st.file_uploader(
+        "Upload certificate template",
+        type=["jpg", "jpeg", "png", "pdf"],
+        key="template_upload",
+        help="Upload JPG/PNG/PDF to replace the default certificate template.",
+    )
+
+with col_list:
+    st.markdown("#### Replace List")
+    excel_file = st.file_uploader(
+        "Upload participant list",
+        type=["xlsx", "xls", "csv"],
+        key="excel_upload",
+        help="Upload Excel/CSV with a required 'Name' column.",
+    )
+
+    if os.path.exists(SAMPLE_EXCEL_PATH):
+        with open(SAMPLE_EXCEL_PATH, "rb") as f:
+            sample_sheet_data = f.read()
+        sample_sheet_name = "sample_name_list.xlsx"
+    else:
+        sample_df = pd.DataFrame({"Name": ["Participant One", "Participant Two"]})
+        sample_buffer = BytesIO()
+        sample_df.to_excel(sample_buffer, index=False)
+        sample_sheet_data = sample_buffer.getvalue()
+        sample_sheet_name = "sample_name_list.xlsx"
+
+    st.download_button(
+        "Download Sample List",
+        data=sample_sheet_data,
+        file_name=sample_sheet_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+with col_sign:
+    st.markdown("#### Replace Sign")
+    sign_files = st.file_uploader(
+        "Upload signature image(s)",
+        type=["png", "jpg", "jpeg"],
+        accept_multiple_files=True,
+        key="sign_upload",
+        help="Upload one or more signature files to replace the default sign.",
+    )
+
+active_template_input = template_file if template_file is not None else (SAMPLE_TEMPLATE_PATH if os.path.exists(SAMPLE_TEMPLATE_PATH) else None)
+active_excel_input = excel_file if excel_file is not None else (SAMPLE_EXCEL_PATH if os.path.exists(SAMPLE_EXCEL_PATH) else None)
+active_sign_inputs = list(sign_files) if sign_files else ([SAMPLE_SIGN_PATH] if os.path.exists(SAMPLE_SIGN_PATH) else [])
+
+st.info("Default template/list/sign are loaded. Replace any of them using the three sections above. If no sign is required, turn off 'Use Signatures' in sidebar.")
+template_source_label = template_file.name if template_file is not None else ("SAMPLE CERTIFICATE.png" if active_template_input else "Not selected")
+excel_source_label = excel_file.name if excel_file is not None else ("Name_list.xlsx" if active_excel_input else "Not selected")
+sign_source_label = "Uploaded signs" if sign_files else ("SAMPLE SIGN.png" if active_sign_inputs else "Not selected")
+st.caption(f"Current sources -> Template: {template_source_label} | Data: {excel_source_label} | Signatures: {sign_source_label}")
 
 # ------------------ SIDEBAR SETTINGS ------------------
 st.sidebar.header("⚙️ Settings")
 
 # Name placement
-name_y = st.sidebar.number_input("Name Y Position", value=105)
+name_x = st.sidebar.number_input("Name X Position (Left/Right)", value=80, key="name_x")
+name_y = st.sidebar.number_input("Name Y Position", value=105, key="name_y")
+st.sidebar.caption("Adjust Name X to move text left or right on the certificate.")
 font_family = st.sidebar.selectbox("Font Family", ["Times", "Arial", "Courier", "Helvetica"])
 font_size = st.sidebar.number_input("Font Size", value=34)
 
 # Certificate numbering
 enable_number = st.sidebar.checkbox("Enable Certificate Numbering")
 number_prefix = st.sidebar.text_input("Number Prefix (optional)", "")
-number_y = st.sidebar.number_input("Number Y Position", value=20)
-number_x = st.sidebar.number_input("Number X Position", value=250)
+number_y = st.sidebar.number_input("Number Y Position", value=20, key="number_y")
+number_x = st.sidebar.number_input("Number X Position", value=250, key="number_x")
 if enable_number:
     st.sidebar.caption(f"Numbering preview: {number_prefix}001")
 
 # Signatures
+use_signatures = st.sidebar.checkbox("Use Signatures", value=True)
 sign_positions = []
-if sign_files:
+if use_signatures and active_sign_inputs:
     st.sidebar.subheader("Signatures Settings")
-    for i, _ in enumerate(sign_files):
+    for i, _ in enumerate(active_sign_inputs):
         with st.sidebar.expander(f"Signature {i+1}"):
             sx = st.number_input(f"X pos (Sign {i+1})", value=50 + i * 80, key=f"sx_{i}")
             sy = st.number_input(f"Y pos (Sign {i+1})", value=150, key=f"sy_{i}")
@@ -67,6 +196,9 @@ if sign_files:
 
 # ------------------ HELPERS ------------------
 def save_uploaded_file_to_tmp(uploaded_file):
+    if isinstance(uploaded_file, str):
+        return uploaded_file
+
     suffix = os.path.splitext(uploaded_file.name)[1]
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     tmp.write(uploaded_file.read())
@@ -89,6 +221,34 @@ def get_poppler_path():
         if os.path.isdir(path):
             return path
     return None
+
+def prepare_template_image(template_input):
+    """Return an image path for template input (supports image or PDF)."""
+    template_path = save_uploaded_file_to_tmp(template_input)
+    ext = os.path.splitext(template_path)[1].lower()
+
+    if ext != ".pdf":
+        return template_path
+
+    out_png = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    out_png.close()
+
+    try:
+        import fitz  # PyMuPDF
+        with fitz.open(template_path) as doc:
+            if len(doc) == 0:
+                raise RuntimeError("PDF template has no pages.")
+            pix = doc[0].get_pixmap(alpha=False)
+            pix.save(out_png.name)
+        return out_png.name
+    except Exception:
+        poppler_path = get_poppler_path()
+        kwargs = {"first_page": 1, "last_page": 1}
+        if poppler_path:
+            kwargs["poppler_path"] = poppler_path
+        pages = convert_from_path(template_path, **kwargs)
+        pages[0].save(out_png.name, format="PNG")
+        return out_png.name
 
 def show_pdf_fallback_preview(pdf_path):
     """Fallback preview: display PDF directly in the browser using base64."""
@@ -130,9 +290,14 @@ def add_certificate_footer(pdf, page_width):
     pdf.set_text_color(0, 0, 0)
 
 # ------------------ MAIN ------------------
-if template_file and excel_file:
+if active_template_input and active_excel_input:
     try:
-        df = pd.read_excel(excel_file)
+        if isinstance(active_excel_input, str) and active_excel_input.lower().endswith(".csv"):
+            df = pd.read_csv(active_excel_input)
+        elif not isinstance(active_excel_input, str) and active_excel_input.name.lower().endswith(".csv"):
+            df = pd.read_csv(active_excel_input)
+        else:
+            df = pd.read_excel(active_excel_input)
     except Exception as e:
         st.error(f"❌ Error reading Excel: {e}")
         st.stop()
@@ -145,12 +310,26 @@ if template_file and excel_file:
     st.success("✅ Files uploaded successfully!")
 
     # Save template & signatures
-    template_path = save_uploaded_file_to_tmp(template_file)
-    sign_paths = [save_uploaded_file_to_tmp(s) for s in sign_files] if sign_files else []
+    try:
+        template_path = prepare_template_image(active_template_input)
+    except Exception as e:
+        st.error(f"❌ Could not process certificate template: {e}")
+        st.stop()
+
+    sign_paths = [save_uploaded_file_to_tmp(s) for s in active_sign_inputs] if (use_signatures and active_sign_inputs) else []
 
     # ------------------ PREVIEW ------------------
-    test_name = st.selectbox("🔍 Preview with:", ["None"] + names)
-    if test_name != "None":
+    st.markdown("### Preview Certificate")
+    st.caption("All names from your list are loaded here. Use the dropdown to switch and preview any name.")
+
+    if names:
+        test_name = st.selectbox(
+            "🔍 Select name for preview",
+            options=names,
+            index=0,
+            help="The first name is selected by default. Choose another name from the dropdown to preview changes.",
+        )
+
         page_width = 297  # A4 landscape
         preview_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
         preview_pdf.close()
@@ -161,8 +340,7 @@ if template_file and excel_file:
 
         # Add name
         pdf.set_font(font_family, '', int(font_size))
-        pdf.set_xy(0, float(name_y))
-        pdf.cell(page_width, 10, txt=test_name, align='C')
+        pdf.text(x=float(name_x), y=float(name_y), txt=test_name)
 
         # Add number
         if enable_number:
@@ -180,6 +358,7 @@ if template_file and excel_file:
         pdf.output(preview_pdf.name)
 
         # Show inline preview
+        preview_image = None
         try:
             with st.spinner("Generating preview..."):
                 poppler_path = get_poppler_path()
@@ -188,11 +367,11 @@ if template_file and excel_file:
                     convert_kwargs["poppler_path"] = poppler_path
 
                 pages = convert_from_path(preview_pdf.name, **convert_kwargs)
-            st.image(pages[0], caption=f"📄 Preview: {test_name}", use_container_width=True)
+            preview_image = pages[0]
         except Exception:
             pymupdf_image = render_preview_with_pymupdf(preview_pdf.name)
             if pymupdf_image is not None:
-                st.image(pymupdf_image, caption=f"📄 Preview: {test_name}", use_container_width=True)
+                preview_image = pymupdf_image
                 st.caption("Preview rendered using PyMuPDF fallback (Poppler not required).")
             else:
                 st.warning("⚠️ Image preview unavailable. Showing embedded PDF preview instead.")
@@ -202,9 +381,14 @@ if template_file and excel_file:
                     "for faster image-based preview."
                 )
 
+        if preview_image is not None:
+            st.image(preview_image, caption=f"📄 Preview: {test_name}", use_container_width=True)
+
         # Download preview
         with open(preview_pdf.name, "rb") as f:
             st.download_button("⬇️ Download Preview", f, file_name="preview_test.pdf")
+    else:
+        st.warning("No names found in the uploaded list. Add values in the Name column to preview certificates.")
 
     # ------------------ GENERATE ALL ------------------
     if st.button("🚀 Generate Certificates"):
@@ -258,16 +442,10 @@ if template_file and excel_file:
                     int(font_size)
                 )
         
-                pdf.set_xy(
-                    0,
-                    float(name_y)
-                )
-        
-                pdf.cell(
-                    page_width,
-                    10,
-                    txt=str(name),
-                    align='C'
+                pdf.text(
+                    x=float(name_x),
+                    y=float(name_y),
+                    txt=str(name)
                 )
         
                 # Certificate Number
@@ -296,8 +474,7 @@ if template_file and excel_file:
 
                 # Name
                 merged_pdf.set_font(font_family, '', int(font_size))
-                merged_pdf.set_xy(0, float(name_y))
-                merged_pdf.cell(page_width, 10, txt=str(name), align='C')
+                merged_pdf.text(x=float(name_x), y=float(name_y), txt=str(name))
 
                 # Number
                 if enable_number:
