@@ -9,10 +9,13 @@ import re
 import shutil
 import base64
 from io import BytesIO
+import sqlite3
+import subprocess
+from datetime import datetime
 from pdf2image import convert_from_path
 
 # ------------------ APP CONFIG ------------------
-st.set_page_config(page_title="Certi Gen", layout="wide")
+st.set_page_config(page_title="Certificate Generator", layout="wide")
 st.markdown(
     """
     <style>
@@ -99,7 +102,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-st.markdown("<h1 class='app-title'>🎓 Certify Pro+</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='app-title'>🎓 Certificate Generator</h1>", unsafe_allow_html=True)
 st.markdown(
     """
     <div class='top-info-card'>
@@ -252,6 +255,8 @@ if use_signatures and active_sign_inputs:
                 sign_positions.append((sx, sy, sw))
 
 # ------------------ HELPERS ------------------
+VISITOR_DB_PATH = "visitor_count.db"
+
 def save_uploaded_file_to_tmp(uploaded_file):
     if isinstance(uploaded_file, str):
         return uploaded_file
@@ -266,6 +271,44 @@ def hex_to_rgb(hex_color):
     """Convert #RRGGBB hex color to RGB tuple for FPDF."""
     hex_color = hex_color.lstrip("#")
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+def get_last_updated_date():
+    """Read latest Git commit date; fallback to app.py modified date."""
+    try:
+        output = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cs"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if output:
+            return output
+    except Exception:
+        pass
+
+    modified_ts = os.path.getmtime(__file__)
+    return datetime.fromtimestamp(modified_ts).strftime("%Y-%m-%d")
+
+def get_or_create_visitor_count():
+    """Persist and increment visitor count once per browser session."""
+    conn = sqlite3.connect(VISITOR_DB_PATH)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS stats (id INTEGER PRIMARY KEY, count INTEGER NOT NULL)")
+        cursor.execute("SELECT count FROM stats WHERE id = 1")
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute("INSERT INTO stats (id, count) VALUES (1, 0)")
+            conn.commit()
+
+        if "visitor_counted" not in st.session_state:
+            cursor.execute("UPDATE stats SET count = count + 1 WHERE id = 1")
+            st.session_state["visitor_counted"] = True
+            conn.commit()
+
+        cursor.execute("SELECT count FROM stats WHERE id = 1")
+        return cursor.fetchone()[0]
+    finally:
+        conn.close()
 
 def get_poppler_path():
     """Return a valid Poppler bin path if available on this machine."""
@@ -596,4 +639,9 @@ if active_template_input and active_excel_input:
 
         st.success("🎉 Certificates generated! Download merged PDF or separate ZIP.")
 
-st.markdown("<div class='app-footer'>Built by NFSU Goa Coding Club</div>", unsafe_allow_html=True)
+last_updated = get_last_updated_date()
+visitor_count = get_or_create_visitor_count()
+st.markdown(
+    f"<div class='app-footer'>Built by NFSU Goa Coding Club | Last updated: {last_updated} | Visitors: {visitor_count}</div>",
+    unsafe_allow_html=True,
+)
