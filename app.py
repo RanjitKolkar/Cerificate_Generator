@@ -15,13 +15,18 @@ st.set_page_config(page_title="Certi Gen", layout="wide")
 st.markdown("<h1 style='color:#2E86C1;'>🎓 Certify Pro+</h1>", unsafe_allow_html=True)
 st.markdown(
     """
-    <h4 style='color:#117A65;'>
-    Generate polished certificates in bulk with dynamic names, optional numbering, and custom signatures.
-    </h4>
-    <p style='font-size:16px;'>
-    Numbering format is <b>Prefix + 3-digit sequence</b> (example: CERT001, TRAINING001).<br>
-    Leave prefix blank to use plain numbering only (001, 002, 003...).
+    <div style='background:#F4F9FF; border:1px solid #D6EAF8; border-radius:10px; padding:14px 18px; margin-bottom:10px;'>
+    <h4 style='color:#117A65; margin:0 0 8px 0;'>How to Use</h4>
+    <p style='font-size:18px; margin:4px 0;'>
+    1) Upload a certificate template (JPG/PNG), 2) upload Excel with a <b>Name</b> column, 3) optionally add signatures,
+    4) preview one certificate, then generate all.
     </p>
+    <p style='font-size:18px; margin:8px 0 4px 0;'><b>Numbering Format:</b> Prefix + 3-digit sequence</p>
+    <p style='font-size:17px; margin:4px 0;'>
+    Example: CERT001, TRAINING001. Leave prefix blank for plain numbering: 001, 002, 003...
+    </p>
+    <p style='font-size:17px; margin:8px 0 0 0;'><b>Available Outputs:</b> Single merged PDF + ZIP folder of separate PDFs.</p>
+    </div>
     """,
     unsafe_allow_html=True,
 )
@@ -37,7 +42,7 @@ st.sidebar.header("⚙️ Settings")
 # Name placement
 name_y = st.sidebar.number_input("Name Y Position", value=105)
 font_family = st.sidebar.selectbox("Font Family", ["Times", "Arial", "Courier", "Helvetica"])
-font_size = st.sidebar.number_input("Font Size", value=32)
+font_size = st.sidebar.number_input("Font Size", value=34)
 
 # Certificate numbering
 enable_number = st.sidebar.checkbox("Enable Certificate Numbering")
