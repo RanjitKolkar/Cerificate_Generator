@@ -52,6 +52,15 @@ st.markdown(
         margin-bottom: 10px;
         color: var(--cg-text-light);
     }
+    .trust-card {
+        background: #f5f8fc;
+        border: 1px solid var(--cg-border-light);
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 10px;
+        color: var(--cg-text-light);
+        font-size: 15px;
+    }
     @media (prefers-color-scheme: dark) {
         .app-title {
             color: var(--cg-text-dark);
@@ -63,6 +72,11 @@ st.markdown(
         }
         .upload-guide-card {
             background: var(--cg-card-dark-2);
+            border-color: var(--cg-border-dark);
+            color: var(--cg-text-dark);
+        }
+        .trust-card {
+            background: #202f44;
             border-color: var(--cg-border-dark);
             color: var(--cg-text-dark);
         }
@@ -175,6 +189,15 @@ template_source_label = template_file.name if template_file is not None else ("S
 excel_source_label = excel_file.name if excel_file is not None else ("Name_list.xlsx" if active_excel_input else "Not selected")
 sign_source_label = "Uploaded signs" if sign_files else ("SAMPLE SIGN.png" if active_sign_inputs else "Not selected")
 st.caption(f"Current sources -> Template: {template_source_label} | Data: {excel_source_label} | Signatures: {sign_source_label}")
+st.markdown(
+    """
+    <div class='trust-card'>
+    <b>Built by NFSU Goa Coding Club.</b><br>
+    Your uploaded files are used only for certificate generation in the current session and are not stored as permanent user data on this platform.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ------------------ SIDEBAR SETTINGS ------------------
 st.sidebar.header("⚙️ Settings")
@@ -573,4 +596,4 @@ if active_template_input and active_excel_input:
 
         st.success("🎉 Certificates generated! Download merged PDF or separate ZIP.")
 
-st.markdown("<div class='app-footer'>Coding Club NFSU Goa</div>", unsafe_allow_html=True)
+st.markdown("<div class='app-footer'>Built by NFSU Goa Coding Club</div>", unsafe_allow_html=True)
