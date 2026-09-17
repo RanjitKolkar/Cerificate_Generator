@@ -185,14 +185,29 @@ name_y = st.sidebar.number_input("Name Y Position", value=105, key="name_y")
 st.sidebar.caption("Adjust Name X to move text left or right on the certificate.")
 font_family = st.sidebar.selectbox("Font Family", ["Times", "Arial", "Courier", "Helvetica"])
 font_size = st.sidebar.number_input("Font Size", value=34)
+name_color = st.sidebar.color_picker("Name Font Color", value="#111111")
 
 # Certificate numbering
 enable_number = st.sidebar.checkbox("Enable Certificate Numbering")
+number_font_family = st.sidebar.selectbox(
+    "Number Font Family",
+    ["Times", "Arial", "Courier", "Helvetica"],
+    index=1,
+)
+number_font_style_label = st.sidebar.selectbox(
+    "Number Font Style",
+    ["Regular", "Bold", "Italic", "Bold Italic"],
+    index=1,
+)
+number_font_size = st.sidebar.number_input("Number Font Size", value=14, min_value=8, max_value=72)
+number_color = st.sidebar.color_picker("Number Font Color", value="#111111")
 if "number_prefix" not in st.session_state:
     st.session_state["number_prefix"] = ""
 if enable_number:
+    preview_weight = "700" if "Bold" in number_font_style_label else "400"
+    preview_style = "italic" if "Italic" in number_font_style_label else "normal"
     st.sidebar.markdown(
-        f"<div style='font-family:{font_family}; font-size:16px; margin-bottom:6px;'><b>Numbering preview:</b> {st.session_state['number_prefix']}001</div>",
+        f"<div style='font-family:{number_font_family}; font-size:{int(number_font_size)}px; color:{number_color}; font-weight:{preview_weight}; font-style:{preview_style}; margin-bottom:6px;'><b>Numbering preview:</b> {st.session_state['number_prefix']}001</div>",
         unsafe_allow_html=True,
     )
 number_prefix = st.sidebar.text_input("Number Prefix (optional)", key="number_prefix")
@@ -223,6 +238,11 @@ def save_uploaded_file_to_tmp(uploaded_file):
     tmp.write(uploaded_file.read())
     tmp.close()
     return tmp.name
+
+def hex_to_rgb(hex_color):
+    """Convert #RRGGBB hex color to RGB tuple for FPDF."""
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
 def get_poppler_path():
     """Return a valid Poppler bin path if available on this machine."""
@@ -319,6 +339,15 @@ if active_template_input and active_excel_input:
 
     names = df['Name'].dropna().astype(str).tolist()
     st.success("✅ Files uploaded successfully!")
+    name_rgb = hex_to_rgb(name_color)
+    number_rgb = hex_to_rgb(number_color)
+    number_style_map = {
+        "Regular": "",
+        "Bold": "B",
+        "Italic": "I",
+        "Bold Italic": "BI",
+    }
+    number_font_style = number_style_map[number_font_style_label]
 
     # Save template & signatures
     try:
@@ -350,14 +379,18 @@ if active_template_input and active_excel_input:
         pdf.image(template_path, x=0, y=0, w=297, h=210)
 
         # Add name
+        pdf.set_text_color(*name_rgb)
         pdf.set_font(font_family, '', int(font_size))
         pdf.text(x=float(name_x), y=float(name_y), txt=test_name)
 
         # Add number
         if enable_number:
-            pdf.set_font(font_family, 'B', 10)
+            pdf.set_text_color(*number_rgb)
+            pdf.set_font(number_font_family, number_font_style, int(number_font_size))
             cert_no = f"{number_prefix}001"
             pdf.text(x=number_x, y=number_y, txt=cert_no)
+
+        pdf.set_text_color(0, 0, 0)
 
         # Add signatures
         for sign_path, pos in zip(sign_paths, sign_positions):
@@ -445,6 +478,7 @@ if active_template_input and active_excel_input:
                 )
         
                 # Name
+                pdf.set_text_color(*name_rgb)
                 pdf.set_font(
                     font_family,
                     '',
@@ -459,8 +493,11 @@ if active_template_input and active_excel_input:
         
                 # Certificate Number
                 if enable_number:
-                    pdf.set_font(font_family, 'B', 14)
+                    pdf.set_text_color(*number_rgb)
+                    pdf.set_font(number_font_family, number_font_style, int(number_font_size))
                     pdf.text(x=number_x, y=number_y, txt=cert_no)
+
+                pdf.set_text_color(0, 0, 0)
 
                 # Signatures
                 for sign_path, pos in zip(
@@ -480,13 +517,17 @@ if active_template_input and active_excel_input:
                 merged_pdf.image(template_path, x=0, y=0, w=297, h=210)
 
                 # Name
+                merged_pdf.set_text_color(*name_rgb)
                 merged_pdf.set_font(font_family, '', int(font_size))
                 merged_pdf.text(x=float(name_x), y=float(name_y), txt=str(name))
 
                 # Number
                 if enable_number:
-                    merged_pdf.set_font(font_family, 'B', 14)
+                    merged_pdf.set_text_color(*number_rgb)
+                    merged_pdf.set_font(number_font_family, number_font_style, int(number_font_size))
                     merged_pdf.text(x=number_x, y=number_y, txt=cert_no)
+
+                merged_pdf.set_text_color(0, 0, 0)
 
                 # Signatures
                 for sign_path, pos in zip(sign_paths, sign_positions):
